@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Welcome to Vue</title>
+  <script src="https://unpkg.com/vue"></script>
+</head>
+<body>
+  <div id="app">
+    <input v-model="query">
+    <div class="main">
+      <div class="col">
+        <table>
+        <thead>
+          <tr>
+            <th>
+              Time
+            </th>
+            <th>
+              Tag
+            </th>
+            <th>
+              Message
+            </th>
+            <th>
+              Stack?
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-on:click="selectLine(line)" v-for="line in linesComputed">
+            <td>
+              {{ line.date.substr(11, 19) }}
+            </td>
+            <td>
+              {{ line.tag }}
+            </td>
+            <td>
+              {{ line.message}}
+            </td>
+            <td>
+              {{ line.stack !== undefined }}
+            </td>
+          </tr>
+        </tbody>
+        </table>
+        </div>
+        <div class="col stack">
+          {{ selected.time }}
+          {{ selected.message}}
+          <div>
+            {{ selected.stack || "no stack" }}
+          </div>
+        </div>
+      </div>
+  </div>
+
+  <script>
+    let lines = {data: []};
+    let cleared = [];
+    var app = new Vue({
+      el: '#app',
+      data: {
+        lines: lines,
+        query: '',
+        cleared: cleared,
+        selected: {},
+      },
+      methods: {
+        selectLine(line) {
+          this.selected = line;
+        }
+      },
+      computed: {
+        linesComputed() {
+          var self = this;
+          const filtered = self.lines.data.filter(function(line) {
+            if (!line.message) {
+              return false;
+            }
+            return line.message.search(self.query) > -1 || line.tag.search(self.query) > -1
+          });
+
+          return filtered.slice(-200).reverse();
+        },
+        clearedCount() {
+          var self = this;
+          return self.cleared.length;
+        }
+      },
+    })
+
+    window.WebSocket = window.WebSocket || window.MozWebSocket;
+
+  var connection = new WebSocket('ws://127.0.0.1:3000');
+
+  connection.onopen = function () {
+    // connection is opened and ready to use
+  };
+
+  connection.onerror = function (error) {
+    // an error occurred when sending/receiving data
+  };
+
+  connection.onmessage = function (message) {
+    if (lines.data.length > 50000) {
+      lines.data = lines.slice(-10000);
+      cleared.push(true);
+    }
+    try {
+      var json = JSON.parse(message.data);
+      lines.data.push(json);
+    } catch (e) {
+      console.log('This doesn\'t look like a valid JSON: ',
+          message.data);
+      return;
+    }
+  };
+  </script>
+  <style type="text/css">
+    .main {
+      display: flex;
+    }
+    .col {
+      border: 1px;
+      flex: 1;
+    }
+
+    table {
+      border: 2px solid #42b983;
+      border-radius: 3px;
+      background-color: #fff;
+    }
+
+    th {
+      background-color: #42b983;
+      color: rgba(255,255,255,0.66);
+      cursor: pointer;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    td {
+      background-color: #f9f9f9;
+    }
+
+    th, td {
+      min-width: 120px;
+      padding: 10px 20px;
+    }
+
+    .stack {
+      margin-left: 20px;
+      border: 2px solid #42b983;
+      border-radius: 3px;
+      background-color: #fff;
+    }
+
+  </style>
+</body>
+</html>
