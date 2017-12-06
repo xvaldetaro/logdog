@@ -6,6 +6,9 @@
 </head>
 <body>
   <div id="app">
+    <div class="connectionClosed" v-if="lines.connectionClosed">
+      Connection IS Closed
+    </div>
     <div class="topForm">
       <div class="topFormCol">
         <label for="query">Query:</label>
@@ -186,7 +189,7 @@
       });
     }
 
-    let lines = {data: [], isPaused: false};
+    let lines = {data: [], isPaused: false, connectionClosed: false};
     let cleared = [];
     let savedLists = localStorage.getItem('savedLists');
     if (!savedLists) {
@@ -268,8 +271,12 @@
       // connection is opened and ready to use
     };
 
+    connection.onclose = function (error) {
+      lines.connectionClosed = true;
+    };
+
     connection.onerror = function (error) {
-      // an error occurred when sending/receiving data
+      lines.connectionClosed = true;
     };
 
     connection.onmessage = function (message) {
@@ -319,6 +326,10 @@
       align-items: stretch;
     }
 
+    .connectionClosed {
+      background: red;
+    }
+    
     body {
       font-size: 12px;
       display: flex;

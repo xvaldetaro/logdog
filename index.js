@@ -40,6 +40,9 @@ fs.readFile('./index.html', function(err, html) {
       const reader = logcat.readStream(logProcess.stdout)
 
       reader.on('entry', entry => {
+        if (entry.tag.search('nyc') === -1) {
+          return;
+        }
         try {
           const messageJson = JSON.parse(entry.message);
           entry.stack = messageJson.stack;
@@ -49,6 +52,13 @@ fs.readFile('./index.html', function(err, html) {
         }
 
         out.buffer.push(entry);
+      })
+
+      reader.on('finish', () => {
+        console.log('finish');
+      })
+      reader.on('close', () => {
+        console.log('closed');
       })
     })
 
