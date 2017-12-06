@@ -23,6 +23,9 @@
               Time
             </th>
             <th>
+              Thread
+            </th>
+            <th>
               Tag
             </th>
             <th>
@@ -34,9 +37,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-on:click="selectLine(line)" v-for="line in linesComputed">
+          <tr v-bind:class="{ selected: (line === selected) }" v-on:click="selectLine(line)" v-for="line in linesComputed">
             <td style="width: 50px">
               {{ line.date.substr(11, 19) }}
+            </td>
+            <td style="width: 50px; max-width: 50px">
+              {{ line.tid }}
             </td>
             <td style="width: 150px; max-width: 150px">
               {{ line.tag }}
@@ -51,64 +57,93 @@
         </tbody>
         </table>
         </div>
-        <div v-if="selected !== undefined" class="col sideContainer">
-          <div class="sideRow">
-            <div class="sideLabel">
-              Time:
-            </div>
-            <div class="sideContent">
-              <p id="time">{{ selected.date }}</p>
-            </div>
-          </div>
-          <div class="sideRow">
-            <div class="sideLabel">
-              Tag:
-            </div>
-            <div class="sideContent">
-              <p id="time">{{ selected.tag }}</p>
-            </div>
-          </div>
-          <div class="sideRow">
-            <div class="sideLabel">
-              Message:
-            </div>
-            <div class="sideContent">
-              <p id="time">{{ selected.message }}</p>
-            </div>
-          </div>
-          <div class="exceptionBox">
-            <div class="sideLabel">
-              Stack:
-            </div>
-            <div class="sideContent exceptionText">
-              <div v-for="stackLine in selected.stack">
-                <a target="_blank" v-bind:href="stackLine.link">{{ stackLine.text }}</a>
+        <template  v-if="selected">
+          <div v-if="selected !== undefined" class="col sideContainer">
+            <div class="sideRow">
+              <div class="sideLabel">
+                Time:
+              </div>
+              <div class="sideContent">
+                <p id="time">{{ selected.date }}</p>
               </div>
             </div>
+            <div class="sideRow">
+              <div class="sideLabel">
+                Tag:
+              </div>
+              <div class="sideContent">
+                <p id="time">{{ selected.tag }}</p>
+              </div>
+            </div>
+            <div class="sideRow">
+              <div class="sideLabel">
+                Message:
+              </div>
+              <div class="sideContent">
+                <p id="time">{{ selected.message }}</p>
+              </div>
+            </div>
+            <template  v-if="selected.formattedStack">
+              <div class="exceptionBox">
+                <div class="sideLabel">
+                  Stack:
+                </div>
+                <div class="sideContent exceptionText">
+                  <div v-for="stackLine in selected.formattedStack">
+                    <a target="_blank" v-bind:href="stackLine.link">{{ stackLine.text }}</a>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
-        </div>
+        </template>
       </div>
   </div>
 
   <script>
+    function getModuleUrl(path) {
+      const moduleUrls = {
+        android: {
+          app: 'https://github.sc-corp.net/Snapchat/android/blob/master/snapchat/app/src/main/java',
+        },
+        map: 'https://github.sc-corp.net/Snapchat/android/blob/master/snapchat/map/src/main/java',
+      }
+      let module = path.split('.');
+
+      let i = 2;
+      let halfPath = moduleUrls;
+      while (true) {
+        if (typeof halfPath === 'string') {
+          return halfPath;
+        }
+        if (!halfPath) {
+          return null;
+        }
+        halfPath = halfPath[module[i]];
+        i++;
+      }
+    }
+
     function formatStack(stack) {
       const lines = stack.split('\n').slice(2);
 
       return lines.map((line) => {
-        const regEx = /(com\.snapchat\.android\.[\w\d\.]+)\([\w\d]+\.([\w\d]+):(\d+)\)/g;
+        const regEx = /(com\.snapchat\.[\w\d\.]+)(\$[\w\d\.]+)?\([\w\d]+\.([\w\d]+):(\d+)\)/g;
         const matches = regEx.exec(line);
         if (!matches) {
           return {text: line};
         }
 
         let path = matches[1];
-        debugger;
-        path = path.substr(0, path.lastIndexOf('.'));
+        const moduleUrl = getModuleUrl(path);
+        if (!matches[2]) { // Has no $runnablepath in the string so remove the function name
+          path = path.substr(0, path.lastIndexOf('.'));
+        }
         path = path.replace(/\./g, '/');
 
-        const lineNumber = matches[3];
-        const fileExtension = matches[2];
-        const link =  `https://github.sc-corp.net/Snapchat/android/blob/master/snapchat/app/src/main/java/${path}.${fileExtension}#L${lineNumber}`;
+        const lineNumber = matches[4];
+        const fileExtension = matches[3];
+        const link = moduleUrl && `${moduleUrl}/${path}.${fileExtension}#L${lineNumber}`;
         return {text: line, link: link};
       });
     }
@@ -127,7 +162,7 @@
       methods: {
         selectLine(line) {
           this.selected = line;
-          this.selected.stack = line.stack && formatStack(line.stack);
+          this.selected.formattedStack = line.stack && formatStack(line.stack);
         },
         onPauseClicked() {
           this.isPaused = !this.isPaused;
@@ -276,6 +311,10 @@
       flex: 1 0 120px;
       margin-left: 10px;
       max-width: 100px;
+    }
+
+    .selected > td {
+      background: #ccc;
     }
 
     .flex-outer > li > label + *,
