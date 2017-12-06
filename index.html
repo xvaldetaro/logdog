@@ -1,12 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Welcome to Vue</title>
+  <title>Logcat viewer</title>
   <script src="https://unpkg.com/vue"></script>
 </head>
 <body>
   <div id="app">
-    <input v-model="query">
+    <div class=".queryBoxContainer">
+      <div class=".queryBoxLabel">
+        Query:
+      </div>
+      <input v-model="query" class=".queryBoxInput">
+      <input type="checkbox" @click="onPauseClicked" v-model="isPaused">
+      <label for="checkbox">Pause</label>
+    </div>
     <div class="main">
       <div class="col">
         <table>
@@ -28,34 +35,85 @@
         </thead>
         <tbody>
           <tr v-on:click="selectLine(line)" v-for="line in linesComputed">
-            <td>
+            <td style="width: 50px">
               {{ line.date.substr(11, 19) }}
             </td>
-            <td>
+            <td style="width: 150px; max-width: 150px">
               {{ line.tag }}
             </td>
-            <td>
+            <td style="width: 300px; max-width: 300px">
               {{ line.message}}
             </td>
-            <td>
+            <td style="width: 20px">
               {{ line.stack !== undefined }}
             </td>
           </tr>
         </tbody>
         </table>
         </div>
-        <div class="col stack">
-          {{ selected.time }}
-          {{ selected.message}}
-          <div>
-            {{ selected.stack || "no stack" }}
+        <div v-if="selected !== undefined" class="col sideContainer">
+          <div class="sideRow">
+            <div class="sideLabel">
+              Time:
+            </div>
+            <div class="sideContent">
+              <p id="time">{{ selected.date }}</p>
+            </div>
+          </div>
+          <div class="sideRow">
+            <div class="sideLabel">
+              Tag:
+            </div>
+            <div class="sideContent">
+              <p id="time">{{ selected.tag }}</p>
+            </div>
+          </div>
+          <div class="sideRow">
+            <div class="sideLabel">
+              Message:
+            </div>
+            <div class="sideContent">
+              <p id="time">{{ selected.message }}</p>
+            </div>
+          </div>
+          <div class="exceptionBox">
+            <div class="sideLabel">
+              Stack:
+            </div>
+            <div class="sideContent exceptionText">
+              <div v-for="stackLine in selected.stack">
+                <a target="_blank" v-bind:href="stackLine.link">{{ stackLine.text }}</a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
   </div>
 
   <script>
-    let lines = {data: []};
+    function formatStack(stack) {
+      const lines = stack.split('\n').slice(2);
+
+      return lines.map((line) => {
+        const regEx = /(com\.snapchat\.android\.[\w\d\.]+)\([\w\d]+\.([\w\d]+):(\d+)\)/g;
+        const matches = regEx.exec(line);
+        if (!matches) {
+          return {text: line};
+        }
+
+        let path = matches[1];
+        debugger;
+        path = path.substr(0, path.lastIndexOf('.'));
+        path = path.replace(/\./g, '/');
+
+        const lineNumber = matches[3];
+        const fileExtension = matches[2];
+        const link =  `https://github.sc-corp.net/Snapchat/android/blob/master/snapchat/app/src/main/java/${path}.${fileExtension}#L${lineNumber}`;
+        return {text: line, link: link};
+      });
+    }
+
+    let lines = {data: [], isPaused: false};
     let cleared = [];
     var app = new Vue({
       el: '#app',
@@ -64,10 +122,16 @@
         query: '',
         cleared: cleared,
         selected: {},
+        isPaused: false,
       },
       methods: {
         selectLine(line) {
           this.selected = line;
+          this.selected.stack = line.stack && formatStack(line.stack);
+        },
+        onPauseClicked() {
+          this.isPaused = !this.isPaused;
+          this.lines.isPaused = this.isPaused;
         }
       },
       computed: {
@@ -77,58 +141,74 @@
             if (!line.message) {
               return false;
             }
-            return line.message.search(self.query) > -1 || line.tag.search(self.query) > -1
+            const iMessage = line.message.toLowerCase();
+            const iTag = line.tag.toLowerCase();
+            const iQuery = self.query.toLowerCase();
+            return iMessage.search(iQuery) > -1 || iTag.search(iQuery) > -1
           });
 
-          return filtered.slice(-200).reverse();
+          return filtered.slice(-1000).reverse();
         },
-        clearedCount() {
-          var self = this;
-          return self.cleared.length;
-        }
       },
     })
 
     window.WebSocket = window.WebSocket || window.MozWebSocket;
 
-  var connection = new WebSocket('ws://127.0.0.1:3000');
+    var connection = new WebSocket('ws://127.0.0.1:3000');
 
-  connection.onopen = function () {
-    // connection is opened and ready to use
-  };
+    connection.onopen = function () {
+      // connection is opened and ready to use
+    };
 
-  connection.onerror = function (error) {
-    // an error occurred when sending/receiving data
-  };
+    connection.onerror = function (error) {
+      // an error occurred when sending/receiving data
+    };
 
-  connection.onmessage = function (message) {
-    if (lines.data.length > 50000) {
-      lines.data = lines.slice(-10000);
-      cleared.push(true);
-    }
-    try {
-      var json = JSON.parse(message.data);
-      lines.data.push(json);
-    } catch (e) {
-      console.log('This doesn\'t look like a valid JSON: ',
-          message.data);
-      return;
-    }
-  };
+    connection.onmessage = function (message) {
+      if (lines.isPaused) {
+        return;
+      }
+
+      if (lines.data.length > 50000) {
+        lines.data = lines.slice(-10000);
+        cleared.push(true);
+      }
+      try {
+        var json = JSON.parse(message.data);
+        lines.data.push.apply(lines.data, json);
+      } catch (e) {
+        console.log('This doesn\'t look like a valid JSON: ',
+            message.data);
+        return;
+      }
+    };
   </script>
+
   <style type="text/css">
+    body {
+      font-size: 12px;
+    }
     .main {
       display: flex;
+      align-items: stretch;
     }
+
     .col {
       border: 1px;
       flex: 1;
+      width: 850;
+    }
+
+    .queryBoxContainer {
+      border: 1px;
+      margin-bottom: 20px;
     }
 
     table {
       border: 2px solid #42b983;
       border-radius: 3px;
       background-color: #fff;
+      width: 800;
     }
 
     th {
@@ -143,20 +223,65 @@
 
     td {
       background-color: #f9f9f9;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     th, td {
-      min-width: 120px;
-      padding: 10px 20px;
+      padding: 4px 4px;
     }
 
-    .stack {
-      margin-left: 20px;
+    .sideContainer {
       border: 2px solid #42b983;
       border-radius: 3px;
       background-color: #fff;
+      display: flex;
+      flex-grow: 3;
+      flex-direction: column;
+      font-size: 14px;
     }
 
+    .sideRow {
+      border: 1px solid #42b983;
+      display: flex;
+      flex-direction: row;
+      padding: 10px;
+    }
+
+    .sideLabel {
+      width: 100px;
+    }
+
+    .sideContent {
+    }
+
+    .exceptionBox {
+      padding: 10px;
+    }
+    .exceptionText {
+      font-size: 10px;
+    }
+
+    .flex-outer li,
+    .flex-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      border-radius: 3px;
+    }
+
+    .flex-outer > li > label,
+    .flex-outer li p {
+      flex: 1 0 120px;
+      margin-left: 10px;
+      max-width: 100px;
+    }
+
+    .flex-outer > li > label + *,
+    .flex-inner {
+      flex: 1 0 100px;
+    }
   </style>
 </body>
 </html>

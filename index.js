@@ -33,25 +33,37 @@ fs.readFile('./index.html', function(err, html) {
   wsServer.on('request', function(request) {
     const connection = request.accept(null, request.origin)
 
+    const out = {buffer: []};
+
     spawn('adb', ['logcat', '-c']).on('close', () => {
       const logProcess = spawn('adb', ['logcat', '-B']);
       const reader = logcat.readStream(logProcess.stdout)
 
       reader.on('entry', entry => {
-        if (entry.tag.search('asdfr') === -1) {
-          return;
-        }
-
         try {
           const messageJson = JSON.parse(entry.message);
           entry.stack = messageJson.stack;
-          entry.message = messageJson.message;
+          entry.message = messageJson.text;
         } catch (e) {
+          // Message is not json, so move along
         }
 
-        connection.sendUTF(JSON.stringify(entry));
+        out.buffer.push(entry);
       })
     })
 
+    const push = () => {
+      if (out.buffer.length) {
+        const buffer = out.buffer;
+        out.buffer = [];
+        connection.sendUTF(JSON.stringify(buffer));
+      }
+
+      setTimeout(() => {
+        push();
+      }, 1000);
+    }
+
+    push();
   })
 })
