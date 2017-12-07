@@ -2,143 +2,163 @@
 <html>
 <head>
   <title>Logcat viewer</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.6.1/css/bulma.min.css">
   <script src="https://unpkg.com/vue"></script>
 </head>
 <body>
-  <div id="app">
-    <div class="connectionClosed" v-if="lines.connectionClosed">
+  <div id="app" class="container is-size-7">
+
+    <div class="box is-danger" v-if="lines.connectionClosed">
       Connection IS Closed
     </div>
-    <div class="topForm">
-      <div class="topFormCol">
-        <label for="query">Query:</label>
-        <input v-model="query" class="queryBoxInput">
+
+    <div class="level box" style="margin-top: 10px">
+      <div class="level-left">
+
+        <div class="level-item">
+          <div class="field is-horizontal">
+            <div class="field-label">
+              <label class="label is-small">Query</label>
+            </div>
+            <div class="field-body">
+              <div class="field">
+                <input v-model="query" class="input is-small">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="level-item">
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" @click="onPauseClicked" v-model="isPaused">
+              Pause
+            </label>
+          </div>
+        </div>
+
+        <div class="level-item">
+          <div class="field">
+            <label class="checkbox">
+              <input type="checkbox" v-model="isCollapsed">
+              Collapse
+            </label>
+          </div>
+        </div>
+
+        <div class="level-item">
+          <div class="field has-addons">
+            <div class="control">
+              <input class="input is-small" v-model="savedListName" placeholder="List name">
+            </div>
+            <div class="control">
+              <a class="button is-small" @click="saveList">
+                Save
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <template v-if="loadedList">
+          <div class="level-item">
+            <a class="button is-small" @click="closeLoadedList">
+              Close Loaded list
+            </a>
+          </div>
+        </template>
+
+
       </div>
-      <div class="topFormCol">
-        <input type="checkbox" @click="onPauseClicked" v-model="isPaused">
-        <label for="checkbox">Pause</label>
-      </div>
-      <div class="topFormCol">
-        <div class="topFormCol">
-          <label for="saveListName">Save as</label>
-          <input id="saveListName" v-model="savedListName">
-        </div>
-        <div class="topFormCol">
-          <button id="saveListButton" @click="saveList">
-          <label for="saveListButton">Save</label>
-        </div>
-      </div>
-      <template v-if="loadedList">
-        <div class="topFormCol">
-          <button id="closeLoadedListButton" @click="closeLoadedList">
-          <label for="closeLoadedListButton">Close LoadedList</label>
-        </div>
-      </template>
-      <template v-if="Object.keys(savedLists).length > 0">
-        <div class="topFormCol">
-          <button id="clearSavedListsButton" @click="clearSavedLists">
-          <label for="clearSavedListsButton">Clear Saved Lists</label>
-        </div>
-      </template>
     </div>
-    <div class="main">
-      <div class="col">
-        <table>
-        <thead>
-          <tr>
-            <th>
-              Time
-            </th>
-            <th>
-              Thread
-            </th>
-            <th>
-              Tag
-            </th>
-            <th>
-              Message
-            </th>
-            <th>
-              Stack?
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-bind:class="{ selected: (line === selected) }" v-on:click="selectLine(line)" v-for="line in linesComputed">
-            <td style="width: 50px">
-              {{ line.date.substr(11, 19) }}
-            </td>
-            <td style="width: 50px; max-width: 50px">
-              {{ line.tid }}
-            </td>
-            <td style="width: 150px; max-width: 150px">
-              {{ line.tag }}
-            </td>
-            <td style="width: 300px; max-width: 300px">
-              {{ line.message}}
-            </td>
-            <td style="width: 20px; max-width: 20px">
-              {{ line.stack !== undefined }}
-            </td>
-          </tr>
-        </tbody>
+
+    <div class="container" style="margin-top: 10px">
+      <div style="height: 800px; overflow-y: scroll">
+        <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
+          <thead>
+            <tr>
+              <th>
+                Time
+              </th>
+              <th>
+                Thread
+              </th>
+              <th>
+                Tag
+              </th>
+              <th>
+                Message
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-bind:class="{ 'is-selected': (line === selected) }" v-on:click="selectLine(line)" v-for="line in linesComputed">
+              <td style="max-width: 60px; overflow: hidden">{{ line.time }}</td><td style="max-width: 20px">{{ line.tid }}</td>
+              <td v-bind:class="{ 'collapsedCellTag': isCollapsed }">{{ line.tag }}</td>
+              <td v-bind:class="{ 'collapsedCellMessage': isCollapsed }">
+                {{ line.message}}
+              </td>
+            </tr>
+          </tbody>
         </table>
-        </div>
-        <template  v-if="selected">
-          <div class="savedListsContainer">
-            <div class="">
-              Saved lists:
-            </div>
-            <div>
-              <div v-for="(list, name) in savedLists" class="sideRow">
-                <div class="savedLists">
-                  <div @click="openList(list)" class="sideLabel">
-                    {{ name }}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
       </div>
-      <div v-if="selected !== undefined" class="col logView">
-        <div class="sideRow">
-          <div class="sideLabel">
-            Time:
+    </div>
+
+    <div class="columns" style="margin-top: 10px">
+      <div class="column">
+        <div class="panel">
+          <p class="panel-heading is-small">
+            Saved lists
+            <a class="button is-small is-pulled-right" @click="clearSavedLists">
+              Clear
+            </a>
+          </p>
+          <div>
+
           </div>
-          <div class="sideContent">
-            <p id="time">{{ selected.date }}</p>
-          </div>
+          <a @click="openList(list)" v-for="(list, name) in savedLists" class="panel-block">
+            <span class="panel-icon">
+              <i class="fa fa-book"></i>
+            </span>
+            {{ name }}
+          </a>
         </div>
-        <div class="sideRow">
-          <div class="sideLabel">
-            Tag:
-          </div>
-          <div class="sideContent">
-            <p id="time">{{ selected.tag }}</p>
-          </div>
-        </div>
-        <div class="sideRow">
-          <div class="sideLabel">
-            Message:
-          </div>
-          <div class="sideContent">
-            <p id="time">{{ selected.message }}</p>
-          </div>
-        </div>
-        <template  v-if="selected.formattedStack">
-          <div class="exceptionBox">
-            <div class="sideLabel">
-              Stack:
-            </div>
-            <div class="sideContent exceptionText">
-              <div v-for="stackLine in selected.formattedStack">
-                <a target="_blank" v-bind:href="stackLine.link">{{ stackLine.text }}</a>
-              </div>
-            </div>
-          </div>
-        </template>
       </div>
+
+      <div v-if="selected !== undefined" class="column is-four-fifths">
+        <div class="box">
+          <div class="content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tag</th>
+                  <th>Time</th>
+                  <th>Thread</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{{selected.tag}}</td>
+                  <td>{{selected.time}}</td>
+                  <td>{{selected.tid}}</td>
+                </tr>
+              </tbody>
+            </table>
+            <h4>Message</h4>
+            <p>{{selected.message}}</p>
+            <h4>Stack</h4>
+            <ul>
+              <li v-for="stackLine in selected.formattedStack">
+                <a v-if="stackLine.link" target="_blank" v-bind:href="stackLine.link">{{ stackLine.text }}</a>
+                <p v-else>{{stackLine.text}}</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 
   <script>
@@ -213,6 +233,7 @@
         savedLists: savedLists,
         savedListName: '',
         loadedList: null,
+        isCollapsed: true,
       },
       methods: {
         selectLine(line) {
@@ -285,7 +306,7 @@
       }
 
       if (lines.data.length > 50000) {
-        lines.data = lines.slice(-10000);
+        lines.data = lines.data.slice(-10000);
         cleared.push(true);
       }
       try {
@@ -298,165 +319,20 @@
       }
     };
   </script>
-
   <style type="text/css">
-    .topForm {
-      align-items: center;
-      display: flex;
-      flex-direction: row;
-      border: 2px solid #42b983;
-      border-radius: 3px;
-      background-color: #fff;
-      padding: 8px;
-    }
+  .collapsedCellMessage {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 500px;
+  }
 
-    .topFormCol {
-      padding: 0 10px;
-      display: flex;
-      flex-direction: row;
-      border: 1px solid #eee;
-      border-top: 0;
-      border-bottom: 0;
-    }
-
-    #app {
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .connectionClosed {
-      background: red;
-    }
-    
-    body {
-      font-size: 12px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .main {
-      display: flex;
-      align-items: stretch;
-    }
-
-    .savedListsContainer {
-      border: 2px solid #42b983;
-      border-radius: 3px;
-      background-color: #fff;
-      padding: 8px;
-      width: 100%;
-    }
-
-    .col {
-      border: 1px;
-      flex: 1;
-      width: 850;
-    }
-
-    .queryBoxContainer {
-      border: 1px;
-      margin-bottom: 20px;
-    }
-
-    table {
-      border: 2px solid #42b983;
-      border-radius: 3px;
-      background-color: #fff;
-    }
-
-    thead {
-      display: block;
-    }
-
-    tbody {
-      display: block;
-      height: 800px;
-      overflow-y: scroll;
-    }
-
-    th {
-      background-color: #42b983;
-      color: rgba(255,255,255,0.66);
-      cursor: pointer;
-      -webkit-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-
-    td {
-      background-color: #f9f9f9;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    th, td {
-      padding: 4px 4px;
-    }
-
-    .sideContainer {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .logView {
-      max-height: 400px;
-      width: 800px;
-      overflow-y: scroll;
-      border: 2px solid #42b983;
-      border-radius: 3px;
-      background-color: #fff;
-      display: block;
-      font-size: 12px;
-    }
-
-    .sideRow {
-      border: 1px solid #42b983;
-      display: flex;
-      flex-direction: row;
-      padding: 5px;
-    }
-
-    .sideLabel {
-      width: 100px;
-    }
-
-    .sideContent {
-    }
-
-    .exceptionBox {
-      padding: 10px;
-    }
-    .exceptionText {
-      font-size: 10px;
-    }
-
-    .flex-outer li,
-    .flex-inner {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      border-radius: 3px;
-    }
-
-    .flex-outer > li > label,
-    .flex-outer li p {
-      flex: 1 0 120px;
-      margin-left: 10px;
-      max-width: 100px;
-    }
-
-    .selected > td {
-      background: #ccc;
-    }
-
-    .flex-outer > li > label + *,
-    .flex-inner {
-      flex: 1 0 100px;
-    }
+  .collapsedCellTag {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+  }
   </style>
 </body>
 </html>
