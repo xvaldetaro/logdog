@@ -30,6 +30,19 @@
         </div>
 
         <div class="level-item">
+          <div class="field is-horizontal">
+            <div class="field-label">
+              <label class="label is-small">Exclude</label>
+            </div>
+            <div class="field-body">
+              <div class="field">
+                <input v-model="exclude" class="input is-small">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="level-item">
           <div class="field">
             <label class="checkbox">
               <input type="checkbox" @click="onPauseClicked" v-model="isPaused">
@@ -60,6 +73,14 @@
           </div>
         </div>
 
+        <template v-if="!loadedList">
+          <div class="level-item">
+            <a class="button is-small" @click="clearLogs">
+              Clear Logs
+            </a>
+          </div>
+        </template>
+
         <template v-if="loadedList">
           <div class="level-item">
             <a class="button is-small" @click="closeLoadedList">
@@ -72,7 +93,7 @@
       </div>
     </div>
 
-    <div class="container" style="margin-top: 10px">
+    <div class="container">
       <div style="height: 800px; overflow-y: scroll">
         <table class="table is-bordered is-striped is-narrow is-hoverable is-fullwidth">
           <thead>
@@ -127,7 +148,7 @@
 
       <div v-if="selected !== undefined" class="column is-four-fifths">
         <div class="box">
-          <div class="content">
+          <div class="content" style="overflow-y: scroll; height: 350px">
             <table>
               <thead>
                 <tr>
@@ -234,6 +255,7 @@
         savedListName: '',
         loadedList: null,
         isCollapsed: true,
+        exclude: '',
       },
       methods: {
         selectLine(line) {
@@ -253,6 +275,9 @@
         clearSavedLists() {
           this.savedLists = {};
           localStorage.setItem('savedLists', "{}");
+        },
+        clearLogs() {
+          this.lines.data = [];
         },
         saveList() {
           const name = this.savedListName;
@@ -276,10 +301,18 @@
             const iMessage = line.message.toLowerCase();
             const iTag = line.tag.toLowerCase();
             const iQuery = self.query.toLowerCase();
-            return iMessage.search(iQuery) > -1 || iTag.search(iQuery) > -1
+            const iExclude = self.exclude.toLowerCase();
+            const doesMatch = iMessage.search(iQuery) > -1 || iTag.search(iQuery) > -1;
+            const doesExclude = iExclude === '' ? false : iMessage.search(iExclude) > -1 || iTag.search(iExclude) > -1;
+
+            return doesMatch && !doesExclude;
           });
 
-          return filtered.slice(-1000).reverse();
+          if (self.loadedList) { // Should change the saveList instead of this
+            return filtered.slice(-1000);
+          } else {
+            return filtered.slice(-1000).reverse();
+          }
         },
       },
     })
